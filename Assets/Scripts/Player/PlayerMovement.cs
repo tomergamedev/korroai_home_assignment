@@ -24,7 +24,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float _walkSpeed = 2f;
     [SerializeField] private float _runSpeed = 3f;
     [SerializeField] private float _jumpHeight = 3f;
-    [SerializeField] private float _rotationSmoothTime = 5f;
+    [SerializeField] private float _hitJumpHeight = 6f;
+    [SerializeField] private float _rotationSmoothTime = 5;
     [SerializeField] private float _smoothVelocitySpeed = 5f;
 
     [Header("Gravity Settings")]
@@ -37,19 +38,18 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask _groundLayerMask;
 
     private CharacterController _characterController;
+    private PlayerInputs _inputs;
 
     private bool _isGrounded;
-    private float _currentSpeed;
-
-    private PlayerInputs _inputs;
+    [SerializeField] private float _currentSpeed;
+    private float _verticalVelocity;
 
     private float _cameraYaw;
     private float _cameraPitch;
     private float _targetRotation;
     private float _rotationVelocity;
-    private float _verticalVelocity;
-    private float _animationBlend;
 
+    private float _animationBlend;
   
 
     // Start is called before the first frame update
@@ -61,16 +61,22 @@ public class PlayerMovement : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-
         CollectInputs();
-        JumpAndGravity();
+
         CheckGround();
+        JumpAndGravity();
         Move();
     }
 
     private void LateUpdate()
     {
         CameraRotation();
+    }
+
+    public void PushFromDamage()
+    {
+        _verticalVelocity = Mathf.Sqrt(_hitJumpHeight * -2f * _gravity);
+        _isGrounded = false;
     }
 
     private void CollectComponents()
@@ -91,7 +97,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void CheckGround()
     {
-        _isGrounded = Physics.CheckSphere(transform.position + Vector3.up * _feetOffset, _groundCheckRadius, _groundLayerMask);
+         _isGrounded = Physics.CheckSphere(transform.position + Vector3.up * _feetOffset, _groundCheckRadius, _groundLayerMask);
+       // _isGrounded = _characterController.isGrounded;
     }
 
     private void Move()
@@ -119,7 +126,7 @@ public class PlayerMovement : MonoBehaviour
 
         const float ANIMATION_BLEND_ZERO_THRESHOLD = 0.01f;
         _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * _smoothVelocitySpeed);
-        if (_animationBlend < ANIMATION_BLEND_ZERO_THRESHOLD) _animationBlend = 0f;
+        if (_animationBlend < ANIMATION_BLEND_ZERO_THRESHOLD) { _animationBlend = 0f; }
 
         Vector3 inputDirection = new Vector3(_inputs.Direction.x, 0.0f, _inputs.Direction.y).normalized;
 
@@ -151,7 +158,8 @@ public class PlayerMovement : MonoBehaviour
             // stop our velocity dropping infinitely when grounded
             if (_verticalVelocity < 0.0f)
             {
-                _verticalVelocity = -10f;
+                const float STICK_TO_GROUND_FORCE = -2f;
+                _verticalVelocity = STICK_TO_GROUND_FORCE;
             }
 
             // Jump
@@ -167,7 +175,6 @@ public class PlayerMovement : MonoBehaviour
             _animator.SetBool("Fall", true);
         }
 
-        // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
         if (_verticalVelocity < _terminalVelocity)
         {
             _verticalVelocity += _gravity * Time.deltaTime;
