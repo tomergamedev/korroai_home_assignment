@@ -4,20 +4,11 @@ using UnityEngine;
 
 public class PlayerInteractions : MonoBehaviour
 {
-    //Unfortunatly, Unity's CharacterController collision system is quite bad. I need to implement a workaround
-    HashSet<ICharacterCollidable> _activeCollisions;
-
     private void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        ICharacterCollidable[] collidables = hit.gameObject.GetComponents<ICharacterCollidable>();
-        foreach (var collidable in collidables)
+        foreach (var interactable in hit.gameObject.GetComponents<IInteractable>())
         {
-            if (!_activeCollisions.Contains(collidable))
-            {
-                collidable.OnCharacterCollisionEnter(hit);
-                _activeCollisions.Add(collidable);
-            }
-            _activeCollisions.IntersectWith(collidables);
+            interactable.Interact();
         }
     }
 }
