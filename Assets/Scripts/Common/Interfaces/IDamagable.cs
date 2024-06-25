@@ -2,5 +2,11 @@ using UnityEngine;
 
 public interface IDamagable
 {
-    void TakeDamage(int damage);
+    public enum DamageType
+    {
+        None,
+        SpikeTrap,
+        KillPlane
+    }
+    void TakeDamage(int damage, DamageType hitType);
 }
