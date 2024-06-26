@@ -1,23 +1,21 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using Cinemachine;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
-    struct PlayerInputs
+    private struct PlayerInputs
     {
         public Vector2 Direction;
+        public Vector2 MouseDelta;
         public bool Jump;
         public bool Sprint;
-
-        public Vector2 MouseDelta;
     }
 
     [Header("Required References")]
     [SerializeField] private Transform _cameraTarget;
     [SerializeField] private Transform _thirdPersonCamera;
+    [SerializeField] private CinemachineVirtualCamera _cinemachineCamera;
     [SerializeField] private Animator _animator;
 
     [Header("Movement Settings")]
@@ -39,18 +37,18 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask _groundLayerMask;
 
     [Header("Camera Settings")]
-    [SerializeField] float _cameraYMin = -30;
-    [SerializeField] float _cameraYMax = 70;
-    [SerializeField] bool _cameraInvertY;
+    [SerializeField] private float _cameraYMin = -30;
+    [SerializeField] private float _cameraYMax = 70;
+    [SerializeField] private bool _cameraInvertY;
 
     private CharacterController _characterController;
     private Oscillator _currentMovingGround;
     private PlayerInputs _inputs;
 
-    private Vector3 _respawnLocation;
+    private bool _isGrounded;
+    private bool _wasGroundedLastFrame;
 
-    public bool _isGrounded;
-    [SerializeField] private float _currentSpeed;
+    private float _currentSpeed;
     private float _verticalVelocity;
 
     private float _cameraYaw;
@@ -58,40 +56,32 @@ public class PlayerMovement : MonoBehaviour
     private float _targetRotation;
     private float _rotationVelocity;
 
+    private Vector3 _spawnPosition;
+
     private float _animationBlend;
 
-    Queue<Vector3> respawnPositions;
-    const int LAST_GROUNDED_POSITIONS_FRAME_COUNT = 5;
-    const float LAST_GROUNDED_POSITION_RECORD_INTERVAL = 0.5f;
-    float last_grounded_position_record_time = 0;
-  
+    private int _animIdJump = Animator.StringToHash("Jump");
+    private int _animIdSpeed = Animator.StringToHash("Speed");
+    private int _animIdFall = Animator.StringToHash("Fall");
+    private int _animIdHit = Animator.StringToHash("Hit");
+
 
     private void Start()
     {
         CollectComponents();
-        respawnPositions = new Queue<Vector3>(LAST_GROUNDED_POSITIONS_FRAME_COUNT);
     }
 
     private void Update()
     {
         CollectInputs();
-
         CheckGround();
+
         JumpAndGravity();
         Move();
     }
 
     private void LateUpdate()
     {
-        if(_isGrounded && last_grounded_position_record_time <= Time.time && !_currentMovingGround)
-        {
-            respawnPositions.Enqueue(transform.position);
-            last_grounded_position_record_time = Time.time + LAST_GROUNDED_POSITION_RECORD_INTERVAL;
-        }
-        if(respawnPositions.Count >= LAST_GROUNDED_POSITIONS_FRAME_COUNT)
-        {
-            respawnPositions.Dequeue();
-        }
         CameraRotation();
     }
 
@@ -99,13 +89,18 @@ public class PlayerMovement : MonoBehaviour
     {
         _verticalVelocity = Mathf.Sqrt(_hitJumpHeight * -2f * _gravity);
         _isGrounded = false;
+        _animator.SetTrigger(_animIdHit);
     }
 
     public void WarpToRespawnLocation()
     {
         _characterController.enabled = false;
-        transform.position = respawnPositions.Dequeue();
+        Vector3 delta = _spawnPosition - transform.position;
+        transform.position = _spawnPosition;
         _characterController.enabled = true;
+
+        _cinemachineCamera.OnTargetObjectWarped(_cinemachineCamera.Follow, delta);
+        _currentSpeed = 0;
     }
 
     private void CollectComponents()
@@ -127,16 +122,19 @@ public class PlayerMovement : MonoBehaviour
     private void CheckGround()
     {
         _currentMovingGround = null;
+        _wasGroundedLastFrame = _isGrounded;
+
         Vector3 origin = transform.position + Vector3.up * _feetOffset;
         _isGrounded = Physics.SphereCast(origin, _groundCheckRadius, Vector3.down, out RaycastHit hitInfo, _groundRayLength, _groundLayerMask, QueryTriggerInteraction.Ignore);
+
         if (_isGrounded) { _currentMovingGround = hitInfo.transform.GetComponent<Oscillator>(); }
+
         Debug.DrawRay(origin, Vector3.down * (_groundRayLength), Color.red);
-        
+
     }
 
     private void Move()
     {
-        // set target speed based on move speed, sprint speed and if sprint is pressed
         float targetSpeed = _inputs.Sprint ? _runSpeed : _walkSpeed;
 
         if (_inputs.Direction == Vector2.zero) targetSpeed = 0.0f;
@@ -171,45 +169,43 @@ public class PlayerMovement : MonoBehaviour
             transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
         }
 
-
         Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
 
-        Vector3 movingGroundVelocity = _currentMovingGround? _currentMovingGround.GetPositionDelta() : Vector3.zero;
+        Vector3 movingGroundVelocity = _currentMovingGround ? _currentMovingGround.GetVelocity() : Vector3.zero;
 
         _characterController.Move(targetDirection.normalized * (_currentSpeed * Time.deltaTime) +
                   Vector3.up * _verticalVelocity * Time.deltaTime + movingGroundVelocity);
 
 
-        _animator.SetFloat("Speed", _animationBlend);
+        _animator.SetFloat(_animIdSpeed, _animationBlend);
     }
 
     private void JumpAndGravity()
     {
         if (_isGrounded)
         {
-            if (!_currentMovingGround)
+            if (!_wasGroundedLastFrame && !_currentMovingGround)
             {
-                _respawnLocation = transform.position;
+                _spawnPosition = transform.position;
             }
-            _animator.SetBool("Fall", false);
-            // stop our velocity dropping infinitely when grounded
+
+            _animator.SetBool(_animIdFall, false);
+            // Stop our velocity dropping infinitely when grounded
             if (_verticalVelocity < 0.0f)
             {
                 const float STICK_TO_GROUND_FORCE = -2f;
                 _verticalVelocity = STICK_TO_GROUND_FORCE;
             }
 
-            // Jump
             if (_inputs.Jump)
             {
-                // the square root of H * -2 * G = how much velocity needed to reach desired height
                 _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
-                _animator.SetTrigger("Jump");
+                _animator.SetTrigger(_animIdJump);
             }
         }
         else
         {
-            _animator.SetBool("Fall", true);
+            _animator.SetBool(_animIdFall, true);
         }
 
         if (_verticalVelocity < _terminalVelocity)
@@ -221,7 +217,6 @@ public class PlayerMovement : MonoBehaviour
     private void CameraRotation()
     {
         const float MOUSE_DELTA_THRESHOLD = 0.01f;
-        // if there is an input and camera position is not fixed
         if (_inputs.MouseDelta.magnitude >= MOUSE_DELTA_THRESHOLD)
         {
             float cameraInvertY = _cameraInvertY ? -1 : 1;
@@ -229,7 +224,7 @@ public class PlayerMovement : MonoBehaviour
             _cameraPitch += _inputs.MouseDelta.y * cameraInvertY;
         }
 
-        // clamp our rotations so our values are limited 360 degrees
+        // Also clamp yaw so values stay within 360 degrees
         _cameraYaw = ClampAngle(_cameraYaw, float.MinValue, float.MaxValue);
         _cameraPitch = ClampAngle(_cameraPitch, _cameraYMin, _cameraYMax);
 
@@ -238,10 +233,10 @@ public class PlayerMovement : MonoBehaviour
             _cameraYaw, 0.0f);
     }
 
-    private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
+    private static float ClampAngle(float angle, float min, float max)
     {
-        if (lfAngle < -360f) lfAngle += 360f;
-        if (lfAngle > 360f) lfAngle -= 360f;
-        return Mathf.Clamp(lfAngle, lfMin, lfMax);
+        if (angle < -360f) angle += 360f;
+        if (angle > 360f) angle -= 360f;
+        return Mathf.Clamp(angle, min, max);
     }
 }

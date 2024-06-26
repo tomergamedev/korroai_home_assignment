@@ -1,6 +1,3 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class LevelManager : MonoBehaviour
@@ -8,16 +5,25 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private PlayerInterface _playerInterface;
     [SerializeField] private LevelCanvas _levelCanvas;
 
-    public static LevelManager Instance;
-
     private void Awake()
     {
-        Instance = this;
         _playerInterface.GetHealth().OnPlayerHealthChanged += OnPlayerHealthChange;
         _playerInterface.GetInteractions().OnInteractionAvailableChanged += _levelCanvas.UpdateInteractGUIActive;
-        Pickup.OnCollected += PickupCollected;
+        Pickup.OnCollected += OnPickupCollected;
+        Door.OnDoorInteracted += OnDoorInteracted;
 
         GameCursor.ToggleGameMode();
+
+        _levelCanvas.UpdateHealthText(_playerInterface.GetHealth().GetHealth());
+        _levelCanvas.UpdateScoreText(0);
+    }
+
+    private void Update()
+    {
+        if (Input.GetButtonDown("Quit"))
+        {
+            SceneLoader.LoadScene(0);
+        }
     }
 
     public PlayerInventory GetPlayerInventory() => _playerInterface.GetInventory();
@@ -26,18 +32,30 @@ public class LevelManager : MonoBehaviour
     {
         if (Health <= 0)
         {
-            EndGame();
+            RestartLevel();
         }
 
         _levelCanvas.UpdateHealthText(Health);
     }
 
-    private void EndGame()
+    private void OnDoorInteracted()
     {
-        SceneLoader.LoadScene(0);
+        if (_playerInterface.GetInventory().HasKey())
+        {
+            SceneLoader.LoadNextScene();
+        }
+        else
+        {
+            _levelCanvas.DisplayKeyRequiredMessage();
+        }
     }
 
-    private void PickupCollected(PickupType pickupType, int amount)
+    private void RestartLevel()
+    {
+        SceneLoader.ReloadCurrentScene();
+    }
+
+    private void OnPickupCollected(PickupType pickupType, int amount)
     {
         _playerInterface.GetInventory().CollectPickup(pickupType, amount);
 
@@ -58,6 +76,7 @@ public class LevelManager : MonoBehaviour
     {
         _playerInterface.GetHealth().OnPlayerHealthChanged -= OnPlayerHealthChange;
         _playerInterface.GetInteractions().OnInteractionAvailableChanged -= _levelCanvas.UpdateInteractGUIActive;
-        Pickup.OnCollected -= PickupCollected;
+        Pickup.OnCollected -= OnPickupCollected;
+        Door.OnDoorInteracted -= OnDoorInteracted;
     }
 }

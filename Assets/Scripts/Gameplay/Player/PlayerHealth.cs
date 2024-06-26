@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerHealth : MonoBehaviour, IDamagable
@@ -9,14 +7,16 @@ public class PlayerHealth : MonoBehaviour, IDamagable
 
     public event Action<int> OnPlayerHealthChanged;
 
-    private PlayerMovement _playerMovement;
     private int _health;
+    private PlayerMovement _playerMovement;
 
-    void Awake()
+    private void Awake()
     {
         _health = _initialHealth;
         _playerMovement = GetComponent<PlayerMovement>();
     }
+
+    public int GetHealth() => _health;
 
     public void TakeDamage(int damage, IDamagable.DamageType hitType)
     {
@@ -37,4 +37,5 @@ public class PlayerHealth : MonoBehaviour, IDamagable
                 break;
         }
     }
+
 }

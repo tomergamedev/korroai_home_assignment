@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Oscillator : MonoBehaviour
@@ -8,11 +6,10 @@ public class Oscillator : MonoBehaviour
     public Vector3 StartPosition;
     public Vector3 EndPosition;
     public Space Space;
-
-    [SerializeField] float _speed;
-    [SerializeField,Range(0f,2f)] float _initialTime;
-
     [HideInInspector] public Vector3 InitialPosition;
+
+    [SerializeField] private float _speed;
+    [SerializeField, Range(0f, 2f)] private float _initialTime;
 
     private Vector3 _positionDelta;
 
@@ -20,7 +17,6 @@ public class Oscillator : MonoBehaviour
     {
         InitialPosition = transform.position;
     }
-
 
     private void Update()
     {
@@ -31,9 +27,9 @@ public class Oscillator : MonoBehaviour
             _ => throw new System.NotImplementedException(),
         };
 
-        _positionDelta = Vector3.Lerp(StartPosition + offset, EndPosition + offset, Mathf.Cos((Time.time * _speed + 1 + _initialTime) * Mathf.PI) / 2f + 0.5f) -transform.position;
+        _positionDelta = Vector3.Lerp(StartPosition + offset, EndPosition + offset, Mathf.Cos((Time.timeSinceLevelLoad * _speed + 1 + _initialTime) * Mathf.PI) / 2f + 0.5f) - transform.position;
         transform.Translate(_positionDelta);
     }
 
-    public Vector3 GetPositionDelta() => _positionDelta;
+    public Vector3 GetVelocity() => _positionDelta;
 }

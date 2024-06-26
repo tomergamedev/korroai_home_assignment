@@ -10,7 +10,12 @@ public class SceneLoader : MonoBehaviour
 
     public static void LoadNextScene()
     {
-        LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+        LoadScene((SceneManager.GetActiveScene().buildIndex + 1) % SceneManager.sceneCountInBuildSettings);
+    }
+
+    public static void ReloadCurrentScene()
+    {
+        LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public static void QuitGame()

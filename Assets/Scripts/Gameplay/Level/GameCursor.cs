@@ -14,6 +14,4 @@ public static class GameCursor
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.Confined;
     }
-
-
 }

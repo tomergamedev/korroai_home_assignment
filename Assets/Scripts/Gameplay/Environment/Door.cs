@@ -1,17 +1,14 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 public class Door : MonoBehaviour, IInteractable
 {
     public bool IsAutoInteract() => false;
 
+    public static event Action OnDoorInteracted;
+
     public void Interact()
     {
-        if (LevelManager.Instance.GetPlayerInventory().HasKey())
-        {
-            SceneLoader.LoadNextScene();
-        }
-        //else display message?
+        OnDoorInteracted?.Invoke();
     }
 }

@@ -1,5 +1,3 @@
-using UnityEngine;
-
 public interface IDamagable
 {
     public enum DamageType

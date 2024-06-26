@@ -35,7 +35,6 @@ public class PlayerInteractions : MonoBehaviour
             foreach (IInteractable interactable in _availableInteractables)
             {
                 interactable.Interact();
-                _availableInteractables.Remove(interactable);
             }
         }
     }
